@@ -1,46 +1,43 @@
-# FROM ubuntu:focal
-FROM nvcr.io/nvidia/pytorch:20.12-py3
+FROM ubuntu:20.04
 
-# 以下の公式リポジトリを参考
-# https://github.com/osrf/docker_images/blob/master/ros/melodic/ubuntu/bionic/ros-core/Dockerfile
+# Set timezone
+ENV TZ=Etc/UTC
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-# setup timezone
-RUN echo 'Etc/UTC' > /etc/timezone && \
-    ln -s /usr/share/zoneinfo/Etc/UTC /etc/localtime && \
-    apt-get update && \
-    apt-get install -q -y --no-install-recommends tzdata && \
-    rm -rf /var/lib/apt/lists/*
-
-# install packages
+# Install dependencies and ROS Noetic
 RUN apt-get update && apt-get install -q -y --no-install-recommends \
+    tzdata \
     dirmngr \
     gnupg2 \
+    lsb-release \
+    curl \
+    sudo \
     && rm -rf /var/lib/apt/lists/*
 
-# setup keys
-RUN apt-key adv --keyserver 'hkp://keyserver.ubuntu.com:80' --recv-key C1CF6E31E6BADE8868B172B4F42ED6FBAB17C654
+# Setup ROS Noetic repository
+RUN curl -sSL 'http://packages.ros.org/ros.key' | apt-key add - && \
+    sh -c 'echo "deb http://packages.ros.org/ros/ubuntu $(lsb_release -cs) main" > /etc/apt/sources.list.d/ros-latest.list'
 
-# setup sources.list
-RUN sh -c 'echo "deb http://packages.ros.org/ros/ubuntu focal main" > /etc/apt/sources.list.d/ros-latest.list'
-# RUN sh -c 'echo "deb http://packages.ros.org/ros-testing/ubuntu focal main" > /etc/apt/sources.list.d/ros-testing.list'
-
-# setup environment
-ENV LANG C.UTF-8
-ENV LC_ALL C.UTF-8
-
-ENV ROS_DISTRO noetic
-
-# install ros packages
+# Install ROS Noetic and RViz
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-noetic-desktop-full \
-    && rm -rf /var/lib/apt/lists/*
+    ros-noetic-rviz \
+    && rm -rf /var/lib/apt/lists/* \
+    ros-noetic-tf \
+    graphviz
+    
+# Setup environment
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+ENV ROS_DISTRO=noetic
 
-# setup entrypoint
+# Source ROS setup.bash
+RUN echo "source /opt/ros/noetic/setup.bash" >> /root/.bashrc
+
+# Setup entrypoint
 COPY ./ros_entrypoint.sh /
 RUN chmod +x /ros_entrypoint.sh
-
 ENTRYPOINT ["/ros_entrypoint.sh"]
 
 WORKDIR /workspace
-
 CMD ["bash"]
